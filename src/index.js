@@ -11,9 +11,10 @@ const mongoose = require("mongoose");
 
 mongoose
   .connect(
-    "mongodb+srv://lddu818:27o3D6VwW2z1zHMj@cluster0.6gomf.mongodb.net/group11Database",
+    "mongodb+srv://lddu818:27o3D6VwW2z1zHMj@cluster0.6gomf.mongodb.net/group11Database?retryWrites=true&w=majority",
     { useNewUrlParser: true }
   )
+  
   .then(() => console.log("MongoDB is connected"))
   .catch((err) => console.log(err));
 
