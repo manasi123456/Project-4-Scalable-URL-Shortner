@@ -42,76 +42,62 @@ const isValidRequestBody = function (requestBody) {
 
 
 const shortenUrl = async function (req, res) {
-     try {
-   if (!isValidRequestBody(req.body)) {
-        return res.status(400).send({ status: false, message: "Please provide data or provide only one longurl" })
-    }
-    let { longUrl } = req.body
-    if (!isValid(longUrl)) {
-        return res.status(400).send({ status: false, message: "Please provide longUrl" })
-    }
-    if (!validUrl.isUri(longUrl)) {
-        return res.status(400).send({ status: false, messege: 'Invalid  URL' })
-    }
-    if (
-        !/^(?:http(s)?:\/\/)?[\w.-]+(?:\.[\w\.-]+)+[\w\-\._~:/?#[\]@!\$&'\(\)\*\+,;=.]+$/.test(
-            longUrl
-        )
-    ) {
-        return res.status(400).send({
-            status: false,
-            message: "Invalid URL. Please provide correct URL",
-        });
-    }
-    //   const longUrl = longUrl
-    // .split("")
-    // .map((a) => a.trim())
-    // .join("");
-
-    const findInCache = await GET_ASYNC(`${longUrl}`);
-    if (findInCache) {
-        let data = JSON.parse(findInCache);
-        return res
-            .status(200)
-            .send({ status: true, message: "Entry from cache", data: data });
-    }
-    const isAlreadyReg = await urlModel
-        .findOne({ longUrl })
-        .select({ createdAt: 0, updatedAt: 0, __v: 0 });
-    if (isAlreadyReg) {
-        await SET_ASYNC(`${longUrl}`, JSON.stringify(isAlreadyReg));
-        res
-            .status(200)
-            .send({
-                status: true,
-                message: `URL data already generated`,
-                data: isAlreadyReg,
-            });
-    } else {
-        const urlCode = shortId.generate(longUrl);
-        let checkUrlCode = await urlModel.findOne({ urlCode: urlCode });
-        if (checkUrlCode) {
-            return res.status(400)
+    try {
+        if (!isValidRequestBody(req.body)) {
+            return res.status(400).send({ status: false, message: "Please provide data or provide only one longurl" })
+        }
+        let { longUrl } = req.body
+        if (!isValid(longUrl)) {
+            return res.status(400).send({ status: false, message: "Please provide longUrl" })
+        }
+        if (!validUrl.isUri(longUrl)) {
+            return res.status(400).send({ status: false, messege: 'Invalid  URL' })
+        }
+         const findInCache = await GET_ASYNC(`${longUrl}`);
+        if (findInCache) {
+            let data = JSON.parse(findInCache);
+            return res
+                .status(200)
+                .send({ status: true, message: "Entry from cache", shortUrl: data.shortUrl });
+        }
+        const isAlreadyReg = await urlModel
+            .findOne({ longUrl })
+            .select({ _id:0,createdAt: 0, updatedAt: 0, __v: 0 });
+        if (isAlreadyReg) {
+            await SET_ASYNC(`${longUrl}`, JSON.stringify(isAlreadyReg));
+            res
+                .status(409)
                 .send({
                     status: false,
                     message: `URL data already generated`,
-                })
+                    data: isAlreadyReg,
+                });
+        } else {
+            const urlCode = shortId.generate(longUrl);
+            let checkUrlCode = await urlModel.findOne({ urlCode: urlCode });
+            if (checkUrlCode) {
+                return res.status(400)
+                    .send({
+                        status: false,
+                        message: `URL data already generated`,
+                    })
+            }
+
+            const shortUrl = `http://localhost:3000/${urlCode}`;
+            const data = {};
+            data["longUrl"] = longUrl;
+            data["shortUrl"] = shortUrl;
+            data["urlCode"] = urlCode;
+
+            let profile = await urlModel.create(data);
+            await SET_ASYNC(`${longUrl}`, JSON.stringify(profile));
+            await SET_ASYNC(`${urlCode}`, JSON.stringify(profile));
+            let profile1=await urlModel.findOne({urlCode:urlCode}).select({ _id:0,createdAt: 0, updatedAt: 0, __v: 0 })
+            res.status(201).send({status:true, data: profile1 });
         }
-
-        const shortUrl = `http://localhost:3000/${urlCode}`;
-        const data = {};
-        data["longUrl"] = longUrl;
-        data["shortUrl"] = shortUrl;
-        data["urlCode"] = urlCode;
-
-        let profile = await urlModel.create(data);
-        await SET_ASYNC(`${longUrl}`, JSON.stringify(profile));
-        await SET_ASYNC(`${urlCode}`, JSON.stringify(profile));
-        res.status(201).send({ data: profile });
-    }
     } catch (err) {
-      console.log(err.message);
-      res.status(500).send({ msg: "Some error occured" });
+        console.log(err.message);
+        res.status(500).send({ msg: "Some error occured" });
     }
 };
 
@@ -135,8 +121,8 @@ const redirectUrl = async function (req, res) {
 
             if (!validData) {
                 return res
-                    .status(400)
-                    .send({ status: false, message: "Please provide a valid URL Code" });
+                    .status(404)
+                    .send({ status: false, message: "url not found " });
             }
 
             await SET_ASYNC(`${urlCode}`, JSON.stringify(validData));
